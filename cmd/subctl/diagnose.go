@@ -157,6 +157,15 @@ var (
 			execute.OnMultiCluster(restConfigProducer, diagnoseAll)
 		},
 	}
+
+	diagnoseServiceDiscoveryCmd = &cobra.Command{
+		Use:   "service discovery",
+		Short: "Run service discovery check",
+		Long:  "This command checks if the Ligthouse components function properly.",
+		Run: func(command *cobra.Command, args []string) {
+			execute.OnMultiCluster(restConfigProducer, execute.IfSubmarinerInstalled(diagnose.ServiceDiscovery))
+		},
+	}
 )
 
 func init() {
@@ -179,6 +188,7 @@ func addDiagnoseSubCommands() {
 	diagnoseCmd.AddCommand(diagnoseKubeProxyModeCmd)
 	diagnoseCmd.AddCommand(diagnoseAllCmd)
 	diagnoseCmd.AddCommand(diagnoseFirewallCmd)
+	diagnoseCmd.AddCommand(diagnoseServiceDiscoveryCmd)
 }
 
 func addDiagnoseFirewallSubCommands() {
