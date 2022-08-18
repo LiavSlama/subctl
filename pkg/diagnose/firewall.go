@@ -29,7 +29,7 @@ import (
 	"github.com/submariner-io/subctl/internal/pods"
 	"github.com/submariner-io/subctl/pkg/cluster"
 	"github.com/submariner-io/subctl/pkg/image"
-	"github.com/submariner-io/submariner-operator/api/submariner/v1alpha1"
+	"github.com/submariner-io/submariner-operator/api/v1alpha1"
 	subv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/port"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -259,8 +259,8 @@ func verifyConnectivity(localClusterInfo, remoteClusterInfo *cluster.Info, optio
 
 	// Spawn the pod on the nonGateway node. If we spawn the pod on Gateway node, the tunnel process can
 	// sometimes drop the udp traffic from client pod until the tunnels are properly setup.
-	cPod, err := spawnClientPodOnNonGatewayNodeWithHostNet(remoteClusterInfo.ClientProducer.ForKubernetes(), options.PodNamespace, podCommand,
-		localClusterInfo.GetImageRepositoryInfo())
+	cPod, err := spawnClientPodOnNonGatewayNodeWithHostNet(remoteClusterInfo.ClientProducer.ForKubernetes(), options.PodNamespace,
+		podCommand, localClusterInfo.GetImageRepositoryInfo())
 	if err != nil {
 		return status.Error(err, "Error spawning the client pod on non-Gateway node of cluster %q", remoteClusterInfo.Name)
 	}

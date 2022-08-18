@@ -5,6 +5,7 @@ export BASE_BRANCH
 export DEFAULT_IMAGE_VERSION
 
 DEFAULT_REPO ?= "quay.io/submariner"
+BUILD_UPX=false
 
 # Define LOCAL_BUILD to build directly on the host and not inside a Dapper container
 ifdef LOCAL_BUILD
@@ -25,9 +26,6 @@ PLATFORMS ?= linux/amd64,linux/arm64
 IMAGES = subctl
 PRELOAD_IMAGES := $(IMAGES) submariner-operator submariner-gateway submariner-globalnet submariner-route-agent lighthouse-agent lighthouse-coredns nettest
 MULTIARCH_IMAGES := subctl
-undefine SKIP
-undefine FOCUS
-undefine E2E_TESTDIR
 
 ifneq (,$(filter ovn,$(USING)))
 SETTINGS = $(DAPPER_SOURCE)/.shipyard.e2e.ovn.yml
@@ -46,7 +44,6 @@ CROSS_BINARIES := $(foreach cross,$(CROSS_TARGETS),$(patsubst %,cmd/bin/subctl-$
 CROSS_TARBALLS := $(foreach cross,$(CROSS_TARGETS),$(patsubst %,dist/subctl-$(VERSION)-%.tar.xz,$(cross)))
 
 override E2E_ARGS += cluster1 cluster2
-override SYSTEM_ARGS += --settings $(SETTINGS) cluster1 cluster2
 export DEPLOY_ARGS
 override UNIT_TEST_ARGS += test internal/env
 override VALIDATE_ARGS += --skip-dirs pkg/client
@@ -74,7 +71,7 @@ deploy: cmd/bin/subctl
 
 # [system-test] runs system level tests for the various `subctl` commands
 system-test:
-	scripts/test/system.sh $(SYSTEM_ARGS)
+	scripts/test/system.sh
 
 clean:
 	rm -f $(BINARIES) $(CROSS_BINARIES) $(CROSS_TARBALLS)
@@ -83,7 +80,6 @@ build: $(BINARIES)
 
 build-cross: $(CROSS_TARBALLS)
 
-licensecheck: BUILD_ARGS=--noupx
 licensecheck: build | bin/lichen
 	bin/lichen -c .lichen.yaml $(BINARIES)
 
@@ -117,11 +113,10 @@ cmd/bin/subctl-%: $(shell find . -name "*.go") $(VENDOR_MODULES)
 	GOOS=$${components[-2]}; \
 	GOARCH=$${components[-1]}; \
 	export GOARCH GOOS; \
-	$(SCRIPTS_DIR)/compile.sh \
-		--ldflags "-X 'github.com/submariner-io/subctl/pkg/version.Version=$(VERSION)' \
-		       -X 'github.com/submariner-io/submariner-operator/api/submariner/v1alpha1.DefaultSubmarinerOperatorVersion=$${DEFAULT_IMAGE_VERSION#v}' \
-		       -X 'github.com/submariner-io/submariner-operator/api/submariner/v1alpha1.DefaultRepo=$(DEFAULT_REPO)'" \
-        --noupx $@ ./cmd $(BUILD_ARGS)
+	LDFLAGS="-X 'github.com/submariner-io/subctl/pkg/version.Version=$(VERSION)' \
+		-X 'github.com/submariner-io/submariner-operator/api/submariner/v1alpha1.DefaultSubmarinerOperatorVersion=$${DEFAULT_IMAGE_VERSION#v}' \
+		-X 'github.com/submariner-io/submariner-operator/api/submariner/v1alpha1.DefaultRepo=$(DEFAULT_REPO)'" \
+	$(SCRIPTS_DIR)/compile.sh $@ ./cmd
 
 ci: golangci-lint markdownlint unit build images
 

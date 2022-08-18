@@ -23,6 +23,7 @@ import (
 	"fmt"
 
 	"github.com/submariner-io/admiral/pkg/reporter"
+	"github.com/submariner-io/subctl/internal/gvr"
 	"github.com/submariner-io/subctl/pkg/cluster"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	"github.com/submariner-io/submariner/pkg/globalnet/constants"
@@ -30,7 +31,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
+	controllerClient "sigs.k8s.io/controller-runtime/pkg/client"
 	mcsv1a1 "sigs.k8s.io/mcs-api/pkg/apis/v1alpha1"
 )
 
@@ -61,8 +62,10 @@ func GlobalnetConfig(clusterInfo *cluster.Info, status reporter.Interface) bool 
 }
 
 func checkClusterGlobalEgressIPs(clusterInfo *cluster.Info, status reporter.Interface) {
-	clusterGlobalEgress, err := clusterInfo.ClientProducer.ForSubmariner().SubmarinerV1().ClusterGlobalEgressIPs(
-		corev1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+	clusterGlobalEgress := &submarinerv1.ClusterGlobalEgressIPList{}
+
+	err := clusterInfo.ClientProducer.ForGeneral().List(context.TODO(), clusterGlobalEgress,
+		controllerClient.InNamespace(corev1.NamespaceAll))
 	if err != nil {
 		status.Failure("Error listing the ClusterGlobalEgressIP resources: %v", err)
 		return
@@ -113,8 +116,9 @@ func checkClusterGlobalEgressIPs(clusterInfo *cluster.Info, status reporter.Inte
 }
 
 func checkGlobalEgressIPs(clusterInfo *cluster.Info, status reporter.Interface) {
-	globalEgressIps, err := clusterInfo.ClientProducer.ForSubmariner().SubmarinerV1().GlobalEgressIPs(
-		corev1.NamespaceAll).List(context.TODO(), metav1.ListOptions{})
+	globalEgressIps := &submarinerv1.GlobalEgressIPList{}
+
+	err := clusterInfo.ClientProducer.ForGeneral().List(context.TODO(), globalEgressIps, controllerClient.InNamespace(corev1.NamespaceAll))
 	if err != nil {
 		status.Failure("Error obtaining GlobalEgressIPs resources: %v", err)
 		return
@@ -146,13 +150,9 @@ func checkGlobalEgressIPs(clusterInfo *cluster.Info, status reporter.Interface) 
 }
 
 func checkGlobalIngressIPs(clusterInfo *cluster.Info, status reporter.Interface) {
-	serviceExportGVR := &schema.GroupVersionResource{
-		Group:    mcsv1a1.GroupVersion.Group,
-		Version:  mcsv1a1.GroupVersion.Version,
-		Resource: "serviceexports",
-	}
+	serviceExportGVR := gvr.FromMetaGroupVersion(mcsv1a1.GroupVersion, "serviceexports")
 
-	serviceExports, err := clusterInfo.ClientProducer.ForDynamic().Resource(*serviceExportGVR).Namespace(corev1.NamespaceAll).
+	serviceExports, err := clusterInfo.ClientProducer.ForDynamic().Resource(serviceExportGVR).Namespace(corev1.NamespaceAll).
 		List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		status.Failure("Error listing ServiceExport resources: %v", err)
@@ -179,8 +179,11 @@ func checkGlobalIngressIPs(clusterInfo *cluster.Info, status reporter.Interface)
 			continue
 		}
 
-		globalIngress, err := clusterInfo.ClientProducer.ForSubmariner().SubmarinerV1().GlobalIngressIPs(ns).Get(context.TODO(),
-			name, metav1.GetOptions{})
+		globalIngress := &submarinerv1.GlobalIngressIP{}
+		err = clusterInfo.ClientProducer.ForGeneral().Get(context.TODO(), controllerClient.ObjectKey{
+			Namespace: ns,
+			Name:      name,
+		}, globalIngress)
 
 		if apierrors.IsNotFound(err) {
 			status.Failure("No matching GlobalIngressIP resource found for exported service \"%s/%s\"", ns, name)

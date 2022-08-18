@@ -31,8 +31,8 @@ import (
 	"github.com/submariner-io/subctl/internal/exit"
 	"github.com/submariner-io/subctl/internal/nodes"
 	"github.com/submariner-io/subctl/pkg/broker"
+	"github.com/submariner-io/subctl/pkg/client"
 	"github.com/submariner-io/subctl/pkg/join"
-	"github.com/submariner-io/submariner-operator/pkg/client"
 	"github.com/submariner-io/submariner-operator/pkg/discovery/network"
 	"k8s.io/client-go/kubernetes"
 )
@@ -290,8 +290,7 @@ func determineClusterID(status reporter.Interface) {
 func getNetworkDetails(clientProducer client.Producer, status reporter.Interface) *network.ClusterNetwork {
 	status.Start("Discovering network details")
 
-	networkDetails, err := network.Discover(clientProducer.ForDynamic(), clientProducer.ForKubernetes(), clientProducer.ForOperator(),
-		constants.OperatorNamespace)
+	networkDetails, err := network.Discover(clientProducer.ForGeneral(), constants.OperatorNamespace)
 	if err != nil {
 		status.Warning("Unable to discover network details: %s", err)
 	} else if networkDetails == nil {

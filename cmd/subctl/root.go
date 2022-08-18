@@ -29,8 +29,16 @@ import (
 	"github.com/submariner-io/subctl/internal/exit"
 	"github.com/submariner-io/subctl/internal/restconfig"
 	"github.com/submariner-io/subctl/pkg/cluster"
-	"github.com/submariner-io/submariner-operator/pkg/client"
+	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes/scheme"
 )
+
+func init() {
+	runtime.Must(apiextensionsv1.AddToScheme(scheme.Scheme))
+	runtime.Must(submarinerv1.AddToScheme(scheme.Scheme))
+}
 
 var restConfigProducer = restconfig.NewProducer()
 
@@ -50,10 +58,7 @@ func Execute() {
 }
 
 func setupTestFrameworkBeforeSuite() {
-	clientProducer, err := client.NewProducerFromRestConfig(framework.RestConfigs[framework.ClusterA])
-	exit.OnErrorWithMessage(err, "Error creating client producer")
-
-	clusterInfo, err := cluster.NewInfo(framework.TestContext.ClusterIDs[framework.ClusterA], clientProducer,
+	clusterInfo, err := cluster.NewInfo(framework.TestContext.ClusterIDs[framework.ClusterA],
 		framework.RestConfigs[framework.ClusterA])
 	exit.OnErrorWithMessage(err, "Error initializing the cluster information")
 

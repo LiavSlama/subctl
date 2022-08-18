@@ -28,18 +28,17 @@ import (
 	"github.com/submariner-io/subctl/internal/constants"
 	"github.com/submariner-io/subctl/internal/image"
 	"github.com/submariner-io/subctl/pkg/broker"
+	"github.com/submariner-io/subctl/pkg/client"
 	"github.com/submariner-io/subctl/pkg/deploy"
 	"github.com/submariner-io/subctl/pkg/secret"
 	"github.com/submariner-io/subctl/pkg/version"
-	"github.com/submariner-io/submariner-operator/pkg/client"
 	"github.com/submariner-io/submariner-operator/pkg/discovery/globalnet"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
-func ClusterToBroker(brokerInfo *broker.Info, options *Options, clientProducer client.Producer,
-	status reporter.Interface,
+func ClusterToBroker(brokerInfo *broker.Info, options *Options, clientProducer client.Producer, status reporter.Interface,
 ) error {
 	err := checkRequirements(clientProducer.ForKubernetes(), options.IgnoreRequirements, status)
 	if err != nil {
@@ -59,9 +58,9 @@ func ClusterToBroker(brokerInfo *broker.Info, options *Options, clientProducer c
 		return status.Error(err, "Error retrieving broker admin config")
 	}
 
-	brokerAdminClientset, err := kubernetes.NewForConfig(brokerAdminConfig)
+	brokerClientProducer, err := client.NewProducerFromRestConfig(brokerAdminConfig)
 	if err != nil {
-		return status.Error(err, "Error retrieving broker admin connection")
+		return status.Error(err, "Error creating broker client producer")
 	}
 
 	brokerNamespace := string(brokerInfo.ClientToken.Data["namespace"])
@@ -72,7 +71,7 @@ func ClusterToBroker(brokerInfo *broker.Info, options *Options, clientProducer c
 	}
 
 	if options.GlobalnetEnabled {
-		err = globalnet.AllocateAndUpdateGlobalCIDRConfigMap(brokerAdminClientset, brokerNamespace, &netconfig, status)
+		err = globalnet.AllocateAndUpdateGlobalCIDRConfigMap(brokerClientProducer.ForGeneral(), brokerNamespace, &netconfig, status)
 		if err != nil {
 			return errors.Wrap(err, "unable to determine the global CIDR")
 		}
@@ -87,7 +86,7 @@ func ClusterToBroker(brokerInfo *broker.Info, options *Options, clientProducer c
 
 	status.Start("Creating SA for cluster")
 
-	brokerInfo.ClientToken, err = broker.CreateSAForCluster(brokerAdminClientset, options.ClusterID, brokerNamespace)
+	brokerInfo.ClientToken, err = broker.CreateSAForCluster(brokerClientProducer.ForKubernetes(), options.ClusterID, brokerNamespace)
 	if err != nil {
 		return status.Error(err, "Error creating SA for cluster")
 	}

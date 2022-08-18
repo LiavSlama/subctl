@@ -23,15 +23,16 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/submariner-io/subctl/internal/constants"
+	"github.com/submariner-io/subctl/pkg/client"
 	"github.com/submariner-io/subctl/pkg/image"
-	"github.com/submariner-io/submariner-operator/api/submariner/v1alpha1"
-	"github.com/submariner-io/submariner-operator/pkg/client"
+	"github.com/submariner-io/submariner-operator/api/v1alpha1"
 	"github.com/submariner-io/submariner-operator/pkg/names"
 	submarinerv1 "github.com/submariner-io/submariner/pkg/apis/submariner.io/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/rest"
+	controllerClient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type Info struct {
@@ -41,15 +42,25 @@ type Info struct {
 	Submariner     *v1alpha1.Submariner
 }
 
-func NewInfo(clusterName string, clientProducer client.Producer, config *rest.Config) (*Info, error) {
+func NewInfo(clusterName string, config *rest.Config) (*Info, error) {
 	info := &Info{
-		Name:           clusterName,
-		RestConfig:     config,
-		ClientProducer: clientProducer,
+		Name:       clusterName,
+		RestConfig: config,
 	}
 
-	submariner, err := info.ClientProducer.ForOperator().SubmarinerV1alpha1().Submariners(constants.SubmarinerNamespace).
-		Get(context.TODO(), names.SubmarinerCrName, metav1.GetOptions{})
+	var err error
+
+	info.ClientProducer, err = client.NewProducerFromRestConfig(config)
+	if err != nil {
+		return nil, errors.Wrap(err, "error creating client producer")
+	}
+
+	submariner := &v1alpha1.Submariner{}
+	err = info.ClientProducer.ForGeneral().Get(context.TODO(), controllerClient.ObjectKey{
+		Namespace: constants.SubmarinerNamespace,
+		Name:      names.SubmarinerCrName,
+	}, submariner)
+
 	if err == nil {
 		info.Submariner = submariner
 	} else if !apierrors.IsNotFound(err) {
@@ -60,8 +71,9 @@ func NewInfo(clusterName string, clientProducer client.Producer, config *rest.Co
 }
 
 func (c *Info) GetGateways() ([]submarinerv1.Gateway, error) {
-	gateways, err := c.ClientProducer.ForSubmariner().SubmarinerV1().
-		Gateways(constants.OperatorNamespace).List(context.TODO(), metav1.ListOptions{})
+	gateways := &submarinerv1.GatewayList{}
+
+	err := c.ClientProducer.ForGeneral().List(context.TODO(), gateways, controllerClient.InNamespace(constants.OperatorNamespace))
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			return []submarinerv1.Gateway{}, nil
@@ -83,8 +95,9 @@ func (c *Info) HasSingleNode() (bool, error) {
 }
 
 func (c *Info) GetLocalEndpoint() (*submarinerv1.Endpoint, error) {
-	endpoints, err := c.ClientProducer.ForSubmariner().SubmarinerV1().Endpoints(constants.OperatorNamespace).List(
-		context.TODO(), metav1.ListOptions{})
+	endpoints := &submarinerv1.EndpointList{}
+
+	err := c.ClientProducer.ForGeneral().List(context.TODO(), endpoints, controllerClient.InNamespace(constants.OperatorNamespace))
 	if err != nil {
 		return nil, errors.Wrap(err, "error listing Endpoints")
 	}
@@ -102,8 +115,9 @@ func (c *Info) GetLocalEndpoint() (*submarinerv1.Endpoint, error) {
 }
 
 func (c *Info) GetAnyRemoteEndpoint() (*submarinerv1.Endpoint, error) {
-	endpoints, err := c.ClientProducer.ForSubmariner().SubmarinerV1().Endpoints(constants.OperatorNamespace).List(
-		context.TODO(), metav1.ListOptions{})
+	endpoints := &submarinerv1.EndpointList{}
+
+	err := c.ClientProducer.ForGeneral().List(context.TODO(), endpoints, controllerClient.InNamespace(constants.OperatorNamespace))
 	if err != nil {
 		return nil, errors.Wrap(err, "error listing Endpoints")
 	}

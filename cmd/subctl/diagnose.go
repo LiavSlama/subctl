@@ -26,7 +26,6 @@ import (
 	"github.com/submariner-io/subctl/internal/restconfig"
 	"github.com/submariner-io/subctl/pkg/cluster"
 	"github.com/submariner-io/subctl/pkg/diagnose"
-	"github.com/submariner-io/submariner-operator/pkg/client"
 )
 
 var (
@@ -237,10 +236,7 @@ func clusterInfoFromKubeConfig(kubeConfig string) *cluster.Info {
 	config, err := producer.ForCluster()
 	exit.OnErrorWithMessage(err, fmt.Sprintf("The provided kubeconfig %q is invalid", kubeConfig))
 
-	clientProducer, err := client.NewProducerFromRestConfig(config.Config)
-	exit.OnErrorWithMessage(err, fmt.Sprintf("Error creating client producer for kubeconfig %q", kubeConfig))
-
-	clusterInfo, err := cluster.NewInfo("", clientProducer, nil)
+	clusterInfo, err := cluster.NewInfo("", config.Config)
 	exit.OnErrorWithMessage(err, fmt.Sprintf("Error initializing cluster information for kubeconfig %q", kubeConfig))
 
 	if clusterInfo.Submariner == nil {
